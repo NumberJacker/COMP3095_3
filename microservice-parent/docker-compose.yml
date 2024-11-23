@@ -1,0 +1,61 @@
+version: '3.9'
+
+# Define services (containers) that will run as part of the microservices stack.
+services:
+
+  product-service:
+    image: product-service
+    ports:
+      - "8084:8084"
+    build:
+      context: ./product-service  # The directory where the Dockerfile is located.
+      dockerfile: ./Dockerfile     # Specify the Dockerfile to use for building the image.
+    container_name: product-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker  # This tells Spring Boot to use the "docker" profile, which could be configured for containerized environments.
+    depends_on:
+      - mongodb
+    networks:
+      - spring
+
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27018:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password
+    volumes:
+      - ./data/mongo/products:/data/db  # The database will persist data here on the host machine.
+      - ./init/mongo/docker-entrypoint-initdb.d/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro  # Initialize MongoDB with data from this script.
+    container_name: mongodb
+    #restart: unless-stopped  # The container will restart if it crashes or the Docker daemon restarts.
+    #command: mongod --auth  # Ensures MongoDB requires authentication.
+    networks:
+      - spring
+
+  mongo-express:
+    image: mongo-express
+    ports:
+      - "8081:8081"
+    environment:
+      - ME_CONFIG_MONGODB_ADMINUSERNAME=admin
+      - ME_CONFIG_MONGODB_ADMINPASSWORD=password
+      - ME_CONFIG_MONGODB_SERVER=mongodb  # Connect Mongo-Express to the MongoDB container by name.
+    container_name: mongo-express
+    #restart: unless-stopped
+    depends_on:
+      - mongodb
+    networks:
+      - spring
+
+
+volumes:
+  mongo-db:
+    driver: local  # Use local driver for persisting data on the host machine.
+
+# Define a custom network called 'spring' using the bridge driver.
+# Containers on this network can communicate with each other using their container names.
+networks:
+  spring:
+    driver: bridge
